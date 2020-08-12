@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from 'react';
+import * as Yup from 'yup';
 import {
   Image,
   View,
@@ -6,12 +7,14 @@ import {
   Platform,
   ScrollView,
   TextInput,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { Form } from '@unform/mobile';
 import { FormHandles } from '@unform/core';
 import Button from '../../Components/button';
+import { useAuth } from '../../hooks/Auth';
 
 import {
   Container,
@@ -24,12 +27,50 @@ import {
 import Input from '../../Components/Input';
 
 import LogoImg from '../../assets/logo.png';
+import getValidationErrors from '../../utils/getValidationErrors';
+
+interface SignInFormData {
+  email: string;
+  password: string;
+}
 
 const SignIn: React.FC = () => {
+  const { signIn } = useAuth();
   const navigation = useNavigation();
   const formRef = useRef<FormHandles>();
   const passwordInputRef = useRef<TextInput>(null);
-  const handleSignIn = useCallback((data: object) => {}, []);
+  const handleSubmit = useCallback(async (data: SignInFormData) => {
+    formRef.current?.setErrors({});
+    try {
+      const schema = Yup.object().shape({
+        email: Yup.string()
+          .required('E-mail obrigatório')
+          .email('Digite um Email Válido'),
+        password: Yup.string().required('Senha obrigatória'),
+      });
+
+      await schema.validate(data, {
+        abortEarly: false,
+      });
+      await signIn({
+        email: data.email,
+        password: data.password,
+      });
+
+      navigation.navigate('Dashboard');
+    } catch (err) {
+      if (err instanceof Yup.ValidationError) {
+        const errors = getValidationErrors(err);
+        formRef.current?.setErrors(errors);
+        return;
+      }
+
+      Alert.alert(
+        'Erro na Autenticação',
+        'Ocorreu um erro ao fazer login, cheque suas credenciais',
+      );
+    }
+  }, []);
 
   return (
     <>
@@ -47,7 +88,7 @@ const SignIn: React.FC = () => {
             <View>
               <Title>Faça se Login</Title>
             </View>
-            <Form onSubmit={handleSignIn} ref={formRef}>
+            <Form onSubmit={handleSubmit} ref={formRef}>
               <Input
                 autoCorrect={false}
                 autoCapitalize="none"
@@ -67,7 +108,7 @@ const SignIn: React.FC = () => {
                 onSubmitEditing={() => {
                   formRef.current?.submitForm();
                 }}
-                name="passowrd"
+                name="password"
                 icon="lock"
                 placeholder="Senha"
               />
